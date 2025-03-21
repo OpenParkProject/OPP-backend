@@ -6,5 +6,5 @@ docker-compose up
 
 Try the backend (prod-mode):
 ```
-docker run ghcr.io/openparkproject/opp-backend:latest -p 10020:10020
+docker run -p 10020:10020 ghcr.io/openparkproject/opp-backend:latest
 ```

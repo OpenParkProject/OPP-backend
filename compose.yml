@@ -1,0 +1,9 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    volumes:
+      - .:/src/
+    ports:
+      - "10020:10020"

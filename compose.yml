@@ -3,7 +3,9 @@ services:
     build:
       context: .
       dockerfile: Containerfile.dev
+    environment:
+      - DEBUG_MODE=true
     volumes:
       - .:/src/
     ports:
-      - "10020:10020"
+      - "8080:8080"

@@ -20,12 +20,12 @@ func NewUserHandler() *UserHandlers {
 }
 
 func (uh *UserHandlers) GetUsers(c *gin.Context, params api.GetUsersParams) {
-	users := uh.dao.GetUsers(params.Limit, params.Offset)
+	users := uh.dao.GetUsers(c.Request.Context(), params.Limit, params.Offset)
 	c.JSON(http.StatusOK, users)
 }
 
 func (uh *UserHandlers) GetUser(c *gin.Context, username string) {
-	user, err := uh.dao.GetUser(username)
+	user, err := uh.dao.GetUser(c.Request.Context(), username)
 	if err != nil {
 		if errors.Is(err, dao.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -44,7 +44,7 @@ func (uh *UserHandlers) AddUser(c *gin.Context) {
 		return
 	}
 
-	if err := uh.dao.AddUser(user); err != nil {
+	if err := uh.dao.AddUser(c.Request.Context(), user); err != nil {
 		if err == dao.ErrUserAlreadyExists {
 			c.JSON(http.StatusConflict, gin.H{"error": "user already exists"})
 			return
@@ -61,7 +61,7 @@ func (uh *UserHandlers) AddUser(c *gin.Context) {
 }
 
 func (uh *UserHandlers) DeleteUsers(c *gin.Context) {
-	if err := uh.dao.DeleteAllUsers(); err != nil {
+	if err := uh.dao.DeleteAllUsers(c.Request.Context()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete all users"})
 		return
 	}
@@ -69,7 +69,7 @@ func (uh *UserHandlers) DeleteUsers(c *gin.Context) {
 }
 
 func (uh *UserHandlers) DeleteUser(c *gin.Context, username string) {
-	if err := uh.dao.DeleteUser(username); err != nil {
+	if err := uh.dao.DeleteUser(c.Request.Context(), username); err != nil {
 		if err == dao.ErrUserNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
@@ -87,7 +87,7 @@ func (uh *UserHandlers) UpdateUser(c *gin.Context, username string) {
 		return
 	}
 
-	if err := uh.dao.UpdateUser(username, userRequest); err != nil {
+	if err := uh.dao.UpdateUser(c.Request.Context(), username, userRequest); err != nil {
 		if err == dao.ErrUserNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return

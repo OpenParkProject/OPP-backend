@@ -1,69 +1,76 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"sync"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DB struct {
-	db *sql.DB
-	mu sync.Mutex
+	pool *pgxpool.Pool
 }
 
 // Singleton instance of DB
 var instance *DB
+var once sync.Once
+var initErr error
 
 func Init() error {
-	db, err := sql.Open("sqlite3", "db/db.sql")
-	if err != nil {
-		return fmt.Errorf("%w", err)
-	}
+	once.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return fmt.Errorf("%w", err)
-	}
+		pool, err := pgxpool.New(ctx, "postgres://user:password@172.17.0.1:5432/db")
+		if err != nil {
+			initErr = fmt.Errorf("unable to create connection pool: %w", err)
+			return
+		}
+		if err := pool.Ping(ctx); err != nil {
+			pool.Close()
+			initErr = fmt.Errorf("database ping failed: %w", err)
+			return
+		}
 
-	instance = &DB{
-		db: db,
-	}
+		instance = &DB{pool: pool}
+		fmt.Println("Database connection pool created successfully")
+	})
 
-	return nil
+	return initErr
 }
 
 func GetDB() *DB {
 	return instance
 }
 
-func (d *DB) Close() error {
-	if d.db == nil {
+func (d *DB) Close() {
+	if d.pool != nil {
+		d.pool.Close()
+		d.pool = nil
+	}
+}
+
+func (d *DB) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
+	if d.pool == nil {
+		return nil, pgx.ErrTxClosed
+	}
+	return d.pool.Query(ctx, query, args...)
+}
+
+func (d *DB) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	if d.pool == nil {
 		return nil
-	} else {
-		return d.db.Close()
 	}
+	return d.pool.QueryRow(ctx, query, args...)
 }
 
-func (d *DB) Query(query string, args ...any) (*sql.Rows, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if d.db == nil {
-		return nil, fmt.Errorf("db not initialized")
-	} else {
-		return d.db.Query(query, args...)
+func (d *DB) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
+	if d.pool == nil {
+		return pgconn.CommandTag{}, pgx.ErrTxClosed
 	}
-}
-
-func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if d.db == nil {
-		return nil, fmt.Errorf("db not initialized")
-	} else {
-		return d.db.Exec(query, args...)
-	}
+	return d.pool.Exec(ctx, query, args...)
 }

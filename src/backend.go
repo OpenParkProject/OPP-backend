@@ -29,9 +29,13 @@ var DEBUG_MODE = os.Getenv("DEBUG_MODE") == "true"
 
 func main() {
 
-	// Initialize the database connection
-	if db.Init() != nil {
-		panic("Failed to initialize database")
+	if err := db.Init(); err != nil {
+		log.Panicf("Failed to initialize database: %v", err)
+	}
+	if db.GetDB() == nil {
+		log.Panicf("Failed to get database instance")
+	} else {
+		defer db.GetDB().Close()
 	}
 
 	opp_handlers := &opp_handlers{
@@ -45,8 +49,6 @@ func main() {
 	if auth == nil {
 		panic("Failed to initialize auth")
 	}
-
-	// options
 
 	r := gin.New()
 	r.Use(gin.Logger())

@@ -3,6 +3,7 @@ package dao
 import (
 	"OPP/backend/api"
 	"OPP/backend/db"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -24,8 +25,8 @@ func NewUserDao() *UserDao {
 	}
 }
 
-func (d *UserDao) GetUsers(limit *int, offset *int) []api.UserResponse {
-	query := "SELECT username, name, surname, email FROM users LIMIT ? OFFSET ?"
+func (d *UserDao) GetUsers(c context.Context, limit *int, offset *int) []api.UserResponse {
+	query := "SELECT username, name, surname, email FROM users LIMIT $1 OFFSET $2"
 	params := []any{20, 0}
 	if limit != nil {
 		params[0] = *limit
@@ -35,7 +36,7 @@ func (d *UserDao) GetUsers(limit *int, offset *int) []api.UserResponse {
 	}
 
 	var users []api.UserResponse
-	rows, err := d.db.Query(query, params...)
+	rows, err := d.db.Query(c, query, params...)
 	if err != nil {
 		fmt.Printf("db error: %v\n", err.Error())
 		return users
@@ -53,9 +54,9 @@ func (d *UserDao) GetUsers(limit *int, offset *int) []api.UserResponse {
 	return users
 }
 
-func (d *UserDao) AddUser(user api.UserRequest) error {
-	query := "INSERT INTO users (username, name, surname, email, password, role) VALUES (?, ?, ?, ?, ?, ?)"
-	_, err := d.db.Exec(query, user.Username, user.Name, user.Surname, user.Email, user.Password, user.Role)
+func (d *UserDao) AddUser(c context.Context, user api.UserRequest) error {
+	query := "INSERT INTO users (username, name, surname, email, password, role) VALUES ($1, $2, $3, $4, $5, $6)"
+	_, err := d.db.Exec(c, query, user.Username, user.Name, user.Surname, user.Email, user.Password, user.Role)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return ErrUserAlreadyExists
@@ -65,9 +66,9 @@ func (d *UserDao) AddUser(user api.UserRequest) error {
 	return nil
 }
 
-func (d *UserDao) GetUser(username string) (*api.UserResponse, error) {
-	query := "SELECT username, name, surname, email FROM users WHERE username = ?"
-	rows, err := d.db.Query(query, username)
+func (d *UserDao) GetUser(c context.Context, username string) (*api.UserResponse, error) {
+	query := "SELECT username, name, surname, email FROM users WHERE username = $1"
+	rows, err := d.db.Query(c, query, username)
 	if err != nil {
 		return nil, fmt.Errorf("db error: %w", err)
 	}
@@ -83,35 +84,32 @@ func (d *UserDao) GetUser(username string) (*api.UserResponse, error) {
 	return nil, ErrUserNotFound
 }
 
-func (d *UserDao) DeleteAllUsers() error {
+func (d *UserDao) DeleteAllUsers(c context.Context) error {
 	query := "DELETE FROM users"
-	_, err := d.db.Exec(query)
+	_, err := d.db.Exec(c, query)
 	if err != nil {
 		return fmt.Errorf("failed to delete all users: %w", err)
 	}
 	return nil
 }
 
-func (d *UserDao) DeleteUser(username string) error {
-	query := "DELETE FROM users WHERE username = ?"
-	result, err := d.db.Exec(query, username)
+func (d *UserDao) DeleteUser(c context.Context, username string) error {
+	query := "DELETE FROM users WHERE username = $1"
+	result, err := d.db.Exec(c, query, username)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to check rows affected: %w", err)
-	}
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return ErrUserNotFound
 	}
 	return nil
 }
 
-func (d *UserDao) UpdateUser(username string, user api.UserRequest) error {
-	query := "UPDATE users SET name = ?, surname = ?, email = ? WHERE username = ?"
-	result, err := d.db.Exec(query, user.Name, user.Surname, user.Email, username)
+func (d *UserDao) UpdateUser(c context.Context, username string, user api.UserRequest) error {
+	query := "UPDATE users SET name = $1, surname = $2, email = $3 WHERE username = $4"
+	result, err := d.db.Exec(c, query, user.Name, user.Surname, user.Email, username)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return ErrUserAlreadyExists
@@ -119,10 +117,7 @@ func (d *UserDao) UpdateUser(username string, user api.UserRequest) error {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to check rows affected: %w", err)
-	}
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return ErrUserNotFound
 	}

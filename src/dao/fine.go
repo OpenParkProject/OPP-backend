@@ -3,6 +3,7 @@ package dao
 import (
 	"OPP/backend/api"
 	"OPP/backend/db"
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -22,8 +23,8 @@ func NewFineDao() *FineDao {
 	}
 }
 
-func (d *FineDao) GetFines(limit *int, offset *int) []api.FineResponse {
-	query := "SELECT id, plate, amount, date FROM fines LIMIT ? OFFSET ?"
+func (d *FineDao) GetFines(c context.Context, limit *int, offset *int) []api.FineResponse {
+	query := "SELECT id, plate, amount, date FROM fines LIMIT $1 OFFSET $2"
 	params := []any{20, 0}
 	if limit != nil {
 		params[0] = *limit
@@ -33,7 +34,7 @@ func (d *FineDao) GetFines(limit *int, offset *int) []api.FineResponse {
 	}
 
 	fines := []api.FineResponse{}
-	rows, err := d.db.Query(query, params...)
+	rows, err := d.db.Query(c, query, params...)
 	if err != nil {
 		fmt.Printf("db error: %v\n", err.Error())
 		return fines
@@ -60,9 +61,9 @@ func (d *FineDao) GetFines(limit *int, offset *int) []api.FineResponse {
 	return fines
 }
 
-func (d *FineDao) GetCarFines(plate string) []api.FineResponse {
-	query := "SELECT id, plate, amount, date FROM fines WHERE plate = ?"
-	rows, err := d.db.Query(query, plate)
+func (d *FineDao) GetCarFines(c context.Context, plate string) []api.FineResponse {
+	query := "SELECT id, plate, amount, date FROM fines WHERE plate = $1"
+	rows, err := d.db.Query(c, query, plate)
 	if err != nil {
 		fmt.Printf("db error: %v\n", err.Error())
 		return []api.FineResponse{}
@@ -90,9 +91,9 @@ func (d *FineDao) GetCarFines(plate string) []api.FineResponse {
 	return fines
 }
 
-func (d *FineDao) AddCarFine(plate string, fine api.FineRequest) (*api.FineResponse, error) {
-	carQuery := "SELECT * FROM cars WHERE plate = ?"
-	carRows, err := d.db.Query(carQuery, plate)
+func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineRequest) (*api.FineResponse, error) {
+	carQuery := "SELECT * FROM cars WHERE plate = $1"
+	carRows, err := d.db.Query(c, carQuery, plate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check car: %w", err)
 	}
@@ -102,16 +103,12 @@ func (d *FineDao) AddCarFine(plate string, fine api.FineRequest) (*api.FineRespo
 		return nil, ErrCarNotFound
 	}
 
-	query := "INSERT INTO fines (plate, amount, date) VALUES (?, ?, ?)"
+	query := "INSERT INTO fines (plate, amount, date) VALUES ($1, $2, $3) RETURNING id"
 	currentDate := time.Now().Format(time.RFC3339)
-	result, err := d.db.Exec(query, plate, fine.Amount, currentDate)
+	var lastId int64
+	err = d.db.QueryRow(c, query, plate, fine.Amount, currentDate).Scan(&lastId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add fine: %w", err)
-	}
-
-	lastId, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fine ID: %w", err)
 	}
 
 	return &api.FineResponse{
@@ -122,18 +119,18 @@ func (d *FineDao) AddCarFine(plate string, fine api.FineRequest) (*api.FineRespo
 	}, nil
 }
 
-func (d *FineDao) DeleteFines() error {
+func (d *FineDao) DeleteFines(c context.Context) error {
 	query := "DELETE FROM fines"
-	_, err := d.db.Exec(query)
+	_, err := d.db.Exec(c, query)
 	if err != nil {
 		return fmt.Errorf("failed to delete all fines: %w", err)
 	}
 	return nil
 }
 
-func (d *FineDao) GetUserFines(username string) ([]api.FineResponse, error) {
-	query := "SELECT f.id, f.plate, f.amount, f.date FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_username = ?"
-	rows, err := d.db.Query(query, username)
+func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineResponse, error) {
+	query := "SELECT f.id, f.plate, f.amount, f.date FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_username = $1"
+	rows, err := d.db.Query(c, query, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user fines: %w", err)
 	}

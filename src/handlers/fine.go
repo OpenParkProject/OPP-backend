@@ -20,12 +20,12 @@ func NewFineHandler() *FineHandlers {
 }
 
 func (fh *FineHandlers) GetFines(c *gin.Context, params api.GetFinesParams) {
-	fines := fh.dao.GetFines(params.Limit, params.Offset)
+	fines := fh.dao.GetFines(c.Request.Context(), params.Limit, params.Offset)
 	c.JSON(http.StatusOK, fines)
 }
 
 func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
-	fines := fh.dao.GetCarFines(plate)
+	fines := fh.dao.GetCarFines(c.Request.Context(), plate)
 	c.JSON(http.StatusOK, fines)
 }
 
@@ -36,7 +36,7 @@ func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
 		return
 	}
 
-	fine, err := fh.dao.AddCarFine(plate, fineRequest)
+	fine, err := fh.dao.AddCarFine(c.Request.Context(), plate, fineRequest)
 	if err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "car not found"})
@@ -50,7 +50,7 @@ func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
 }
 
 func (fh *FineHandlers) DeleteFines(c *gin.Context) {
-	if err := fh.dao.DeleteFines(); err != nil {
+	if err := fh.dao.DeleteFines(c.Request.Context()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete all fines"})
 		return
 	}
@@ -58,7 +58,7 @@ func (fh *FineHandlers) DeleteFines(c *gin.Context) {
 }
 
 func (fh *FineHandlers) GetUserFines(c *gin.Context, username string) {
-	fines, err := fh.dao.GetUserFines(username)
+	fines, err := fh.dao.GetUserFines(c.Request.Context(), username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user fines"})
 		return

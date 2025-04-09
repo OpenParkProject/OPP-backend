@@ -13,7 +13,7 @@ CREATE TABLE cars (
     plate TEXT PRIMARY KEY,
     brand TEXT,
     model TEXT,
-    user_username INTEGER NOT NULL,
+    user_username TEXT NOT NULL,
     FOREIGN KEY (user_username) REFERENCES users(username) ON DELETE CASCADE
 );
 

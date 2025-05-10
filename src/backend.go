@@ -1,4 +1,4 @@
-//go:generate oapi-codegen --exclude-tags=session -generate types,gin-server -o api/api.gen.go -package api api/openapi.yaml
+//go:generate oapi-codegen --exclude-tags=session,user -generate types,gin-server -o api/api.gen.go -package api api/openapi.yaml
 
 package main
 
@@ -19,13 +19,12 @@ import (
 )
 
 type opp_handlers struct {
-	handlers.UserHandlers
 	handlers.CarHandlers
 	handlers.TicketHandlers
 	handlers.FineHandlers
 }
 
-var DEBUG_MODE = os.Getenv("DEBUG_MODE") == "true"
+var DEBUG_MODE = os.Getenv("DEBUG_MODE")
 
 func main() {
 
@@ -39,15 +38,9 @@ func main() {
 	}
 
 	opp_handlers := &opp_handlers{
-		UserHandlers:   *handlers.NewUserHandler(),
 		CarHandlers:    *handlers.NewCarHandler(),
 		TicketHandlers: *handlers.NewTicketHandler(),
 		FineHandlers:   *handlers.NewFineHandler(),
-	}
-
-	auth := auth.NewAuth()
-	if auth == nil {
-		panic("Failed to initialize auth")
 	}
 
 	r := gin.New()
@@ -63,7 +56,7 @@ func main() {
 	}
 
 	silenceServersWarning := false
-	if DEBUG_MODE {
+	if DEBUG_MODE == "true" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)

@@ -1,17 +1,26 @@
 services:
-  backend:
+  opp-backend:
     build:
       context: .
       dockerfile: Containerfile.dev
     environment:
-      - DEBUG_MODE=true
+      DEBUG_MODE: false
+      AUTH_URL: http://opp-auth:8090/api/v1
+      PUBKEY_ENDPOINT: /pubkey
+      OPP_BACKEND_DB_HOST: opp-postgres-backend
+      OPP_BACKEND_DB_PORT: 5432
+      POSTGRES_BACKEND_USER: user
+      POSTGRES_BACKEND_PASSWORD: password
+      POSTGRES_BACKEND_DB: db
     volumes:
       - .:/src/
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
-  postgres:
+      - opp-postgres-backend
+    extra_hosts:
+      - "opp-auth:host-gateway"
+  opp-postgres-backend:
     image: postgres:latest
     environment:
       POSTGRES_USER: user

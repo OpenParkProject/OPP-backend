@@ -14,8 +14,8 @@ RUN go build -o /go/bin/opp-backend
 FROM alpine:latest AS production
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /root/
-COPY --from=0 /go/bin/opp-backend .
-COPY --from=0 /go/src/app/api/openapi.yaml ./api/openapi.yaml
+COPY --from=builder /go/bin/opp-backend .
+COPY --from=builder /go/src/app/api/openapi.yaml ./api/openapi.yaml
 EXPOSE 8080
 
 CMD ["./opp-backend"]

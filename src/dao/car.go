@@ -60,12 +60,12 @@ func (d *CarDao) GetCars(c context.Context, limit *int, offset *int, currentlyPa
 }
 
 func (d *CarDao) GetUserCars(c context.Context, username string, currentlyParked *bool) []api.Car {
-	query := "SELECT c.plate, c.brand, c.model FROM cars c WHERE c.user_username = $1"
+	query := "SELECT c.plate, c.brand, c.model FROM cars c WHERE c.user_id = $1"
 	params := []any{username}
 	if currentlyParked != nil && *currentlyParked {
 		query = "SELECT c.plate, c.brand, c.model FROM cars c " +
 			"INNER JOIN tickets t ON c.plate = t.plate " +
-			"WHERE c.user_username = ? AND t.status = 'active'"
+			"WHERE c.user_id = ? AND t.status = 'active'"
 	}
 
 	cars := []api.Car{}
@@ -89,19 +89,8 @@ func (d *CarDao) GetUserCars(c context.Context, username string, currentlyParked
 }
 
 func (d *CarDao) AddUserCar(c context.Context, username string, car api.Car) error {
-	userQuery := "SELECT * FROM users WHERE username = $1"
-	userRows, err := d.db.Query(c, userQuery, username)
-	if err != nil {
-		return fmt.Errorf("failed to check user: %w", err)
-	}
-	defer userRows.Close()
-
-	if !userRows.Next() {
-		return ErrUserNotFound
-	}
-
-	query := "INSERT INTO cars (plate, brand, model, user_username) VALUES ($1, $2, $3, $4)"
-	_, err = d.db.Exec(c, query, car.Plate, car.Brand, car.Model, username)
+	query := "INSERT INTO cars (plate, brand, model, user_id) VALUES ($1, $2, $3, $4)"
+	_, err := d.db.Exec(c, query, car.Plate, car.Brand, car.Model, username)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return ErrCarAlreadyExists
@@ -113,18 +102,7 @@ func (d *CarDao) AddUserCar(c context.Context, username string, car api.Car) err
 }
 
 func (d *CarDao) UpdateUserCar(c context.Context, username string, car api.Car) error {
-	userQuery := "SELECT * FROM users WHERE username = $1"
-	userRows, err := d.db.Query(c, userQuery, username)
-	if err != nil {
-		return fmt.Errorf("failed to check user: %w", err)
-	}
-	defer userRows.Close()
-
-	if !userRows.Next() {
-		return ErrUserNotFound
-	}
-
-	carQuery := "SELECT * FROM cars WHERE plate = $1 AND user_username = $2"
+	carQuery := "SELECT * FROM cars WHERE plate = $1 AND user_id = $2"
 	carRows, err := d.db.Query(c, carQuery, car.Plate, username)
 	if err != nil {
 		return fmt.Errorf("failed to check car: %w", err)
@@ -135,7 +113,7 @@ func (d *CarDao) UpdateUserCar(c context.Context, username string, car api.Car) 
 		return ErrCarNotFound
 	}
 
-	query := "UPDATE cars SET brand = $1, model = $2 WHERE plate = $3 AND user_username = $4"
+	query := "UPDATE cars SET brand = $1, model = $2 WHERE plate = $3 AND user_id = $4"
 	_, err = d.db.Exec(c, query, car.Brand, car.Model, car.Plate, username)
 	if err != nil {
 		return fmt.Errorf("failed to update car: %w", err)
@@ -145,18 +123,7 @@ func (d *CarDao) UpdateUserCar(c context.Context, username string, car api.Car) 
 }
 
 func (d *CarDao) DeleteUserCar(c context.Context, username string, plate string) error {
-	userQuery := "SELECT * FROM users WHERE username = $1"
-	userRows, err := d.db.Query(c, userQuery, username)
-	if err != nil {
-		return fmt.Errorf("failed to check user: %w", err)
-	}
-	defer userRows.Close()
-
-	if !userRows.Next() {
-		return ErrUserNotFound
-	}
-
-	query := "DELETE FROM cars WHERE user_username = $1 AND plate = $2"
+	query := "DELETE FROM cars WHERE user_id = $1 AND plate = $2"
 	result, err := d.db.Exec(c, query, username, plate)
 	if err != nil {
 		return fmt.Errorf("failed to delete car: %w", err)

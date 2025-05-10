@@ -129,7 +129,7 @@ func (d *FineDao) DeleteFines(c context.Context) error {
 }
 
 func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineResponse, error) {
-	query := "SELECT f.id, f.plate, f.amount, f.date FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_username = $1"
+	query := "SELECT f.id, f.plate, f.amount, f.date FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_id = $1"
 	rows, err := d.db.Query(c, query, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user fines: %w", err)

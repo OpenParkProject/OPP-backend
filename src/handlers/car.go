@@ -20,6 +20,33 @@ func NewCarHandler() *CarHandlers {
 }
 
 func (ch *CarHandlers) DeleteCars(c *gin.Context) {
+	// Auth middleware sets values in request context
+	// not in gin context
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	roleStr, ok := role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+	if roleStr != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
 	if err := ch.dao.DeleteAllCars(c.Request.Context()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete all cars"})
 		return
@@ -28,16 +55,58 @@ func (ch *CarHandlers) DeleteCars(c *gin.Context) {
 }
 
 func (ch *CarHandlers) GetCars(c *gin.Context, params api.GetCarsParams) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	roleStr, ok := role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+	if roleStr != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
 	cars := ch.dao.GetCars(c.Request.Context(), params.Limit, params.Offset, params.CurrentlyParked)
 	c.JSON(http.StatusOK, cars)
 }
 
-func (ch *CarHandlers) DeleteUserCar(c *gin.Context, username string, plate string) {
-	if err := ch.dao.DeleteUserCar(c.Request.Context(), username, plate); err != nil {
-		if errors.Is(err, dao.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			return
-		}
+func (ch *CarHandlers) DeleteUserCar(c *gin.Context, plate string) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
+	if err := ch.dao.DeleteUserCar(c.Request.Context(), usernamestr, plate); err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "car not found"})
 			return
@@ -49,23 +118,61 @@ func (ch *CarHandlers) DeleteUserCar(c *gin.Context, username string, plate stri
 	c.JSON(http.StatusOK, gin.H{"message": "car deleted successfully"})
 }
 
-func (ch *CarHandlers) GetUserCars(c *gin.Context, username string, params api.GetUserCarsParams) {
-	cars := ch.dao.GetUserCars(c.Request.Context(), username, params.CurrentlyParked)
+func (ch *CarHandlers) GetUserCars(c *gin.Context, params api.GetUserCarsParams) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
+	cars := ch.dao.GetUserCars(c.Request.Context(), usernamestr, params.CurrentlyParked)
 	c.JSON(http.StatusOK, cars)
 }
 
-func (ch *CarHandlers) UpdateUserCar(c *gin.Context, username string, plate string) {
+func (ch *CarHandlers) UpdateUserCar(c *gin.Context, plate string) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
 	var car api.Car
 	if err := c.ShouldBindJSON(&car); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	if err := ch.dao.UpdateUserCar(c.Request.Context(), username, car); err != nil {
-		if errors.Is(err, dao.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			return
-		}
+	if err := ch.dao.UpdateUserCar(c.Request.Context(), usernamestr, car); err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "car not found"})
 			return
@@ -81,18 +188,35 @@ func (ch *CarHandlers) UpdateUserCar(c *gin.Context, username string, plate stri
 	c.JSON(http.StatusOK, gin.H{"message": "car updated successfully"})
 }
 
-func (ch *CarHandlers) AddUserCar(c *gin.Context, username string) {
+func (ch *CarHandlers) AddUserCar(c *gin.Context) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
 	var car api.Car
 	if err := c.ShouldBindJSON(&car); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	if err := ch.dao.AddUserCar(c.Request.Context(), username, car); err != nil {
-		if errors.Is(err, dao.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			return
-		}
+	if err := ch.dao.AddUserCar(c.Request.Context(), usernamestr, car); err != nil {
 		if errors.Is(err, dao.ErrCarAlreadyExists) {
 			c.JSON(http.StatusConflict, gin.H{"error": "car already exists"})
 			return

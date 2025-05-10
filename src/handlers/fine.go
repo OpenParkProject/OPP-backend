@@ -57,8 +57,29 @@ func (fh *FineHandlers) DeleteFines(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "all fines deleted successfully"})
 }
 
-func (fh *FineHandlers) GetUserFines(c *gin.Context, username string) {
-	fines, err := fh.dao.GetUserFines(c.Request.Context(), username)
+func (fh *FineHandlers) GetUserFines(c *gin.Context) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
+	fines, err := fh.dao.GetUserFines(c.Request.Context(), usernamestr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user fines"})
 		return

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -20,12 +21,27 @@ var instance *DB
 var once sync.Once
 var initErr error
 
+var schemaPath = "postgres_schema_v1.sql"
+
+var OPP_BACKEND_DB_HOST = os.Getenv("OPP_BACKEND_DB_HOST")
+var OPP_BACKEND_DB_PORT = os.Getenv("OPP_BACKEND_DB_PORT")
+var POSTGRES_BACKEND_USER = os.Getenv("POSTGRES_BACKEND_USER")
+var POSTGRES_BACKEND_PASSWORD = os.Getenv("POSTGRES_BACKEND_PASSWORD")
+var POSTGRES_BACKEND_DB = os.Getenv("POSTGRES_BACKEND_DB")
+
 func Init() error {
 	once.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		pool, err := pgxpool.New(ctx, "postgres://user:password@172.17.0.1:5432/db")
+		pool, err := pgxpool.New(ctx, fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+			POSTGRES_BACKEND_USER,
+			POSTGRES_BACKEND_PASSWORD,
+			OPP_BACKEND_DB_HOST,
+			OPP_BACKEND_DB_PORT,
+			POSTGRES_BACKEND_DB,
+		))
+
 		if err != nil {
 			initErr = fmt.Errorf("unable to create connection pool: %w", err)
 			return
@@ -33,6 +49,21 @@ func Init() error {
 		if err := pool.Ping(ctx); err != nil {
 			pool.Close()
 			initErr = fmt.Errorf("database ping failed: %w", err)
+			return
+		}
+
+		// Read schema file
+		schemaSQL, err := os.ReadFile("db/" + schemaPath)
+		if err != nil {
+			pool.Close()
+			initErr = fmt.Errorf("failed to read schema file: %w", err)
+			return
+		}
+		// Apply schema
+		_, err = pool.Exec(ctx, string(schemaSQL))
+		if err != nil {
+			pool.Close()
+			initErr = fmt.Errorf("failed to apply database schema: %w", err)
 			return
 		}
 

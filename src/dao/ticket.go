@@ -174,7 +174,7 @@ func (d *TicketDao) GetCarTickets(c context.Context, plate string) ([]api.Ticket
 }
 
 func (d *TicketDao) GetUserTickets(c context.Context, username string, validOnly bool) ([]api.TicketResponse, error) {
-	query := "SELECT t.id, t.plate, t.start_date, t.end_date, t.price, t.paid, t.creation_time FROM tickets AS t JOIN cars AS c ON t.plate = c.plate WHERE c.user_username = $1"
+	query := "SELECT t.id, t.plate, t.start_date, t.end_date, t.price, t.paid, t.creation_time FROM tickets AS t JOIN cars AS c ON t.plate = c.plate WHERE c.user_id = $1"
 	if validOnly {
 		query += " AND t.paid = 1 AND t.end_date >= datetime('now')"
 	}

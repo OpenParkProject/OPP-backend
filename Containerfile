@@ -16,6 +16,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /root/
 COPY --from=builder /go/bin/opp-backend .
 COPY --from=builder /go/src/app/api/openapi.yaml ./api/openapi.yaml
+COPY --from=builder /go/src/app/db/postgres_schema_v1.sql ./db/postgres_schema_v1.sql
 EXPOSE 8080
 
 CMD ["./opp-backend"]

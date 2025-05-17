@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Containerfile.dev
     environment:
-      DEBUG_MODE: false
+      DEBUG_MODE: true
       AUTH_URL: http://opp-auth:8090/api/v1
       PUBKEY_ENDPOINT: /pubkey
       OPP_BACKEND_DB_HOST: opp-postgres-backend

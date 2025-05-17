@@ -43,18 +43,10 @@ func (d *FineDao) GetFines(c context.Context, limit *int, offset *int) []api.Fin
 
 	for rows.Next() {
 		var fine api.FineResponse
-		var date string
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &date); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date); err != nil {
 			fmt.Printf("row scan error: %v\n", err.Error())
 			continue
 		}
-
-		parsedDate, err := time.Parse(time.RFC3339, date)
-		if err != nil {
-			fmt.Printf("failed to parse date: %v\n", err.Error())
-			continue
-		}
-		fine.Date = parsedDate
 		fines = append(fines, fine)
 	}
 
@@ -73,18 +65,10 @@ func (d *FineDao) GetCarFines(c context.Context, plate string) []api.FineRespons
 	fines := []api.FineResponse{}
 	for rows.Next() {
 		var fine api.FineResponse
-		var date string
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &date); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date); err != nil {
 			fmt.Printf("row scan error: %v\n", err.Error())
 			continue
 		}
-
-		parsedDate, err := time.Parse(time.RFC3339, date)
-		if err != nil {
-			fmt.Printf("failed to parse date: %v\n", err.Error())
-			continue
-		}
-		fine.Date = parsedDate
 		fines = append(fines, fine)
 	}
 
@@ -104,7 +88,7 @@ func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineReque
 	}
 
 	query := "INSERT INTO fines (plate, amount, date) VALUES ($1, $2, $3) RETURNING id"
-	currentDate := time.Now().Format(time.RFC3339)
+	currentDate := time.Now()
 	var lastId int64
 	err = d.db.QueryRow(c, query, plate, fine.Amount, currentDate).Scan(&lastId)
 	if err != nil {
@@ -115,7 +99,7 @@ func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineReque
 		Id:     lastId,
 		Plate:  plate,
 		Amount: fine.Amount,
-		Date:   time.Now(),
+		Date:   currentDate,
 	}, nil
 }
 
@@ -139,16 +123,9 @@ func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineRe
 	fines := []api.FineResponse{}
 	for rows.Next() {
 		var fine api.FineResponse
-		var date string
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &date); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date); err != nil {
 			return nil, fmt.Errorf("row scan error: %w", err)
 		}
-
-		parsedDate, err := time.Parse(time.RFC3339, date)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse date: %w", err)
-		}
-		fine.Date = parsedDate
 		fines = append(fines, fine)
 	}
 

@@ -4,7 +4,9 @@ import (
 	"OPP/backend/api"
 	"OPP/backend/dao"
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +19,25 @@ func NewTicketHandler() *TicketHandlers {
 	return &TicketHandlers{
 		dao: *dao.NewTicketDao(),
 	}
+}
+
+func ValidateTicketRequest(req api.TicketRequest) error {
+	now := time.Now()
+
+	if req.StartDate.Before(now) {
+		return fmt.Errorf("start_date must be in the future")
+	}
+
+	endDate := req.StartDate.Add(time.Duration(req.Duration) * time.Minute)
+	if endDate.Before(now) {
+		return fmt.Errorf("end_date must be in the future")
+	}
+
+	if req.Duration <= 0 {
+		return fmt.Errorf("duration must be greater than zero")
+	}
+
+	return nil
 }
 
 func (th *TicketHandlers) GetTickets(c *gin.Context, params api.GetTicketsParams) {
@@ -92,6 +113,12 @@ func (th *TicketHandlers) AddCarTicket(c *gin.Context, plate string) {
 	var ticketRequest api.TicketRequest
 	if err := c.ShouldBindJSON(&ticketRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	err := ValidateTicketRequest(ticketRequest)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

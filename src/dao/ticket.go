@@ -12,6 +12,7 @@ import (
 var (
 	ErrTicketNotFound    = errors.New("ticket not found")
 	ErrTicketAlreadyPaid = errors.New("ticket already paid")
+	ErrTicketNotOwned    = errors.New("ticket not owned by user")
 )
 
 type TicketDao struct {
@@ -194,4 +195,43 @@ func (d *TicketDao) GetUserTickets(c context.Context, username string, validOnly
 	}
 
 	return tickets, nil
+}
+
+func (d *TicketDao) DeleteTicketById(c context.Context, username string, id int64) error {
+	ticket, err := d.GetTicketById(c, id)
+	if err != nil {
+		if errors.Is(err, ErrTicketNotFound) {
+			return ErrTicketNotFound
+		}
+		return fmt.Errorf("failed to get ticket: %w", err)
+	}
+
+	if ticket.Paid {
+		return ErrTicketAlreadyPaid
+	}
+
+	// Check if the user owns the ticket
+	query := "SELECT 1 FROM cars WHERE plate = $1 AND user_username = $2"
+	rows, err := d.db.Query(c, query, ticket.Plate, username)
+	if err != nil {
+		return fmt.Errorf("failed to check ticket ownership: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return ErrTicketNotOwned
+	}
+
+	deleteQuery := "DELETE FROM tickets WHERE id = $1"
+	result, err := d.db.Exec(c, deleteQuery, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete ticket: %w", err)
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return ErrTicketNotFound
+	}
+
+	return nil
 }

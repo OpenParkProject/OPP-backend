@@ -197,3 +197,46 @@ func (th *TicketHandlers) GetUserTickets(c *gin.Context, params api.GetUserTicke
 	c.JSON(http.StatusOK, tickets)
 
 }
+
+func (th *TicketHandlers) DeleteTicketById(c *gin.Context, id int64) {
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	usernamestr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
+		return
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	_, ok = role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+		return
+	}
+
+	err := th.dao.DeleteTicketById(c.Request.Context(), usernamestr, id)
+	if err != nil {
+		if errors.Is(err, dao.ErrTicketNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticket not found"})
+			return
+		}
+		if errors.Is(err, dao.ErrTicketNotOwned) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "ticket not owned by user"})
+			return
+		}
+		if errors.Is(err, dao.ErrTicketAlreadyPaid) {
+			c.JSON(http.StatusConflict, gin.H{"error": "ticket already paid"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete ticket"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "ticket deleted successfully"})
+}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -26,7 +27,7 @@ func NewTicketDao() *TicketDao {
 }
 
 func (d *TicketDao) GetTickets(c context.Context, limit *int, offset *int, validOnly *bool, startDateAfter *time.Time, endDateBefore *time.Time) []api.TicketResponse {
-	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time FROM tickets"
+	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time, zone_id FROM tickets"
 	var conditions []string
 	var params []any
 
@@ -69,9 +70,10 @@ func (d *TicketDao) GetTickets(c context.Context, limit *int, offset *int, valid
 	}
 	defer rows.Close()
 
+	// Update the scan to include zone_id
 	for rows.Next() {
 		var ticket api.TicketResponse
-		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime); err != nil {
+		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime, &ticket.ZoneId); err != nil {
 			continue
 		}
 		tickets = append(tickets, ticket)
@@ -81,7 +83,7 @@ func (d *TicketDao) GetTickets(c context.Context, limit *int, offset *int, valid
 }
 
 func (d *TicketDao) GetTicketById(c context.Context, id int64) (*api.TicketResponse, error) {
-	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time FROM tickets WHERE id = $1"
+	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time, zone_id FROM tickets WHERE id = $1"
 	rows, err := d.db.Query(c, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query ticket: %w", err)
@@ -93,7 +95,7 @@ func (d *TicketDao) GetTicketById(c context.Context, id int64) (*api.TicketRespo
 	}
 
 	var ticket api.TicketResponse
-	if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime); err != nil {
+	if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime, &ticket.ZoneId); err != nil {
 		return nil, fmt.Errorf("failed to scan ticket: %w", err)
 	}
 
@@ -113,12 +115,21 @@ func (d *TicketDao) AddCarTicket(c context.Context, plate string, ticket api.Tic
 	}
 
 	endTime := ticket.StartDate.Add(time.Duration(ticket.Duration) * time.Minute)
-	price := float32(ticket.Duration) / 60.0
+
+	// Price calculation based on zone
+	zone, err := NewZoneDao().GetZoneById(c, ticket.ZoneId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get zone: %w", err)
+	}
+
+	durationInHours := float32(ticket.Duration) / 60.0
+	priceComponent := zone.PriceLin * durationInHours
+	price := zone.PriceOffset + float32(math.Pow(float64(priceComponent), float64(zone.PriceExp)))
 
 	creationTime := time.Now()
-	query := "INSERT INTO tickets (plate, start_date, end_date, price, paid, creation_time) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
+	query := "INSERT INTO tickets (plate, start_date, end_date, price, paid, creation_time, zone_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
 	var lastId int64
-	err = d.db.QueryRow(c, query, plate, ticket.StartDate, endTime, price, false, creationTime).Scan(&lastId)
+	err = d.db.QueryRow(c, query, plate, ticket.StartDate, endTime, price, false, creationTime, ticket.ZoneId).Scan(&lastId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add ticket: %w", err)
 	}
@@ -131,6 +142,7 @@ func (d *TicketDao) AddCarTicket(c context.Context, plate string, ticket api.Tic
 		Price:        price,
 		Paid:         false,
 		CreationTime: creationTime,
+		ZoneId:       ticket.ZoneId,
 	}, nil
 }
 
@@ -154,7 +166,7 @@ func (d *TicketDao) PayTicket(c context.Context, id int64) (*api.TicketResponse,
 }
 
 func (d *TicketDao) GetCarTickets(c context.Context, plate string) ([]api.TicketResponse, error) {
-	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time FROM tickets WHERE plate = $1"
+	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time, zone_id FROM tickets WHERE plate = $1"
 	rows, err := d.db.Query(c, query, plate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tickets: %w", err)
@@ -164,7 +176,7 @@ func (d *TicketDao) GetCarTickets(c context.Context, plate string) ([]api.Ticket
 	tickets := []api.TicketResponse{}
 	for rows.Next() {
 		var ticket api.TicketResponse
-		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime); err != nil {
+		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime, &ticket.ZoneId); err != nil {
 			return nil, fmt.Errorf("failed to scan ticket: %w", err)
 		}
 		tickets = append(tickets, ticket)
@@ -174,7 +186,7 @@ func (d *TicketDao) GetCarTickets(c context.Context, plate string) ([]api.Ticket
 }
 
 func (d *TicketDao) GetUserTickets(c context.Context, username string, validOnly bool) ([]api.TicketResponse, error) {
-	query := "SELECT t.id, t.plate, t.start_date, t.end_date, t.price, t.paid, t.creation_time FROM tickets AS t JOIN cars AS c ON t.plate = c.plate WHERE c.user_id = $1"
+	query := "SELECT t.id, t.plate, t.start_date, t.end_date, t.price, t.paid, t.creation_time, t.zone_id FROM tickets AS t JOIN cars AS c ON t.plate = c.plate WHERE c.user_id = $1"
 	if validOnly {
 		query += " AND t.paid = TRUE AND t.end_date >= NOW()"
 	}
@@ -188,7 +200,7 @@ func (d *TicketDao) GetUserTickets(c context.Context, username string, validOnly
 	tickets := []api.TicketResponse{}
 	for rows.Next() {
 		var ticket api.TicketResponse
-		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime); err != nil {
+		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime, &ticket.ZoneId); err != nil {
 			return nil, fmt.Errorf("failed to scan ticket: %w", err)
 		}
 		tickets = append(tickets, ticket)

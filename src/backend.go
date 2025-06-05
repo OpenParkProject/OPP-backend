@@ -22,6 +22,7 @@ type opp_handlers struct {
 	handlers.CarHandlers
 	handlers.TicketHandlers
 	handlers.FineHandlers
+	handlers.ZoneHandlers
 }
 
 var DEBUG_MODE = os.Getenv("DEBUG_MODE")
@@ -41,6 +42,7 @@ func main() {
 		CarHandlers:    *handlers.NewCarHandler(),
 		TicketHandlers: *handlers.NewTicketHandler(),
 		FineHandlers:   *handlers.NewFineHandler(),
+		ZoneHandlers:   *handlers.NewZoneHandler(),
 	}
 
 	r := gin.New()

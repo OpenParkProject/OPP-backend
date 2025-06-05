@@ -21,7 +21,7 @@ services:
     extra_hosts:
       - "opp-auth:host-gateway"
   opp-postgres-backend:
-    image: postgres:latest
+    image: postgis/postgis:latest
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password

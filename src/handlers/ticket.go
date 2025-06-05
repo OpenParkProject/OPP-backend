@@ -3,6 +3,7 @@ package handlers
 import (
 	"OPP/backend/api"
 	"OPP/backend/dao"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,7 +22,7 @@ func NewTicketHandler() *TicketHandlers {
 	}
 }
 
-func ValidateTicketRequest(req api.TicketRequest) error {
+func ValidateTicketRequest(c context.Context, req api.TicketRequest) error {
 	now := time.Now()
 
 	if req.StartDate.Before(now) {
@@ -35,6 +36,14 @@ func ValidateTicketRequest(req api.TicketRequest) error {
 
 	if req.Duration <= 0 {
 		return fmt.Errorf("duration must be greater than zero")
+	}
+
+	res, err := dao.NewZoneDao().ZoneExists(c, req.ZoneId)
+	if err != nil {
+		return fmt.Errorf("failed to check zone existence: %w", err)
+	}
+	if !res {
+		return fmt.Errorf("zone with id %d does not exist", req.ZoneId)
 	}
 
 	return nil
@@ -116,7 +125,7 @@ func (th *TicketHandlers) AddCarTicket(c *gin.Context, plate string) {
 		return
 	}
 
-	err := ValidateTicketRequest(ticketRequest)
+	err := ValidateTicketRequest(c, ticketRequest)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

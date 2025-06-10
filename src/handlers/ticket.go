@@ -39,14 +39,6 @@ func ValidateTicketRequest(c context.Context, req api.TicketRequest) error {
 		return fmt.Errorf("duration must be greater than zero")
 	}
 
-	res, err := dao.NewZoneDao().ZoneExists(c, req.ZoneId)
-	if err != nil {
-		return fmt.Errorf("failed to check zone existence: %w", err)
-	}
-	if !res {
-		return fmt.Errorf("zone with id %d does not exist", req.ZoneId)
-	}
-
 	return nil
 }
 
@@ -87,7 +79,7 @@ func (th *TicketHandlers) GetTicketById(c *gin.Context, id int64) {
 	c.JSON(http.StatusOK, ticket)
 }
 
-func (th *TicketHandlers) AddCarTicket(c *gin.Context, plate string) {
+func (th *TicketHandlers) CreateZoneTicket(c *gin.Context, zoneId int64) {
 	var ticketRequest api.TicketRequest
 	if err := c.ShouldBindJSON(&ticketRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
@@ -99,8 +91,18 @@ func (th *TicketHandlers) AddCarTicket(c *gin.Context, plate string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Ensure Zone exists before creating a ticket
+	res, err := dao.NewZoneDao().ZoneExists(c, zoneId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check zone existence"})
+		return
+	}
+	if !res {
+		c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
+		return
+	}
 
-	ticket, err := th.dao.AddCarTicket(c.Request.Context(), plate, ticketRequest)
+	ticket, err := th.dao.CreateZoneTicket(c.Request.Context(), zoneId, ticketRequest)
 	if err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "car not found"})
@@ -185,4 +187,24 @@ func (th *TicketHandlers) DeleteTicketById(c *gin.Context, id int64) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "ticket deleted successfully"})
+}
+
+func (fh *FineHandlers) GetZoneTickets(c *gin.Context, zoneId int64, params api.GetZoneTicketsParams) {
+	username, _, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+
+	role, err := dao.NewZoneDao().CheckUserZonePermission(c.Request.Context(), zoneId, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check zone permissions"})
+		return
+	}
+	if role != "admin" && role != "controller" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	fines := fh.dao.GetZoneTickets(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
+	c.JSON(http.StatusOK, fines)
 }

@@ -277,3 +277,18 @@ func (zh *ZoneHandlers) RemoveZoneUserRole(c *gin.Context, id int64, username st
 
 	c.JSON(http.StatusOK, gin.H{"message": "user removed from zone successfully"})
 }
+
+func (zh *ZoneHandlers) GetUserZones(c *gin.Context) {
+	username, _, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+
+	zones, err := zh.dao.GetUserZones(c.Request.Context(), username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user zones"})
+		return
+	}
+
+	c.JSON(http.StatusOK, zones)
+}

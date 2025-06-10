@@ -25,7 +25,7 @@ func (fh *FineHandlers) GetFines(c *gin.Context, params api.GetFinesParams) {
 	if err != nil {
 		return
 	}
-	if role != "admin" && role != "controller" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -39,7 +39,7 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 	if err != nil {
 		return
 	}
-	if role != "admin" && role != "controller" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -48,7 +48,7 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 	c.JSON(http.StatusOK, fines)
 }
 
-func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
+func (fh *FineHandlers) CreateZoneFine(c *gin.Context, zoneId int64) {
 	_, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
@@ -64,7 +64,7 @@ func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
 		return
 	}
 
-	fine, err := fh.dao.AddCarFine(c.Request.Context(), plate, fineRequest)
+	fine, err := fh.dao.CreateZoneFine(c.Request.Context(), zoneId, fineRequest)
 	if err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "car not found"})
@@ -113,7 +113,7 @@ func (fh *FineHandlers) GetFineById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -169,4 +169,24 @@ func (fh *FineHandlers) PayFine(c *gin.Context, id int64) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "fine paid successfully"})
+}
+
+func (fh *FineHandlers) GetZoneFines(c *gin.Context, zoneId int64, params api.GetZoneFinesParams) {
+	username, _, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+
+	role, err := dao.NewZoneDao().CheckUserZonePermission(c.Request.Context(), zoneId, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check zone permissions"})
+		return
+	}
+	if role != "admin" && role != "controller" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	fines := fh.dao.GetZoneFines(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
+	c.JSON(http.StatusOK, fines)
 }

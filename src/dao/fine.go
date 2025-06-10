@@ -78,9 +78,9 @@ func (d *FineDao) GetCarFines(c context.Context, plate string) []api.FineRespons
 	return fines
 }
 
-func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineRequest) (*api.FineResponse, error) {
+func (d *FineDao) CreateZoneFine(c context.Context, zoneId int64, fine api.FineRequest) (*api.FineResponse, error) {
 	carQuery := "SELECT * FROM cars WHERE plate = $1"
-	carRows, err := d.db.Query(c, carQuery, plate)
+	carRows, err := d.db.Query(c, carQuery, fine.Plate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check car: %w", err)
 	}
@@ -90,29 +90,29 @@ func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineReque
 		return nil, ErrCarNotFound
 	}
 
-	res, err := NewZoneDao().ZoneExists(c, fine.ZoneId)
+	res, err := NewZoneDao().ZoneExists(c, zoneId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check zone existence: %w", err)
 	}
 	if !res {
-		return nil, fmt.Errorf("zone with ID %d does not exist", fine.ZoneId)
+		return nil, fmt.Errorf("zone with ID %d does not exist", zoneId)
 	}
 
 	query := "INSERT INTO fines (plate, amount, date, paid, zone_id) VALUES ($1, $2, $3, FALSE, $4) RETURNING id"
 	currentDate := time.Now()
 	var lastId int64
-	err = d.db.QueryRow(c, query, plate, fine.Amount, currentDate, fine.ZoneId).Scan(&lastId)
+	err = d.db.QueryRow(c, query, fine.Plate, fine.Amount, currentDate, zoneId).Scan(&lastId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add fine: %w", err)
 	}
 
 	return &api.FineResponse{
 		Id:     lastId,
-		Plate:  plate,
+		Plate:  fine.Plate,
 		Amount: fine.Amount,
 		Date:   currentDate,
 		Paid:   false,
-		ZoneId: fine.ZoneId,
+		ZoneId: zoneId,
 	}, nil
 }
 
@@ -202,4 +202,26 @@ func (d *FineDao) PayFine(c context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+func (d *FineDao) GetZoneFines(ctx context.Context, zoneId int64, limit int, offset int) []api.FineResponse {
+	query := "SELECT id, plate, amount, date, paid, zone_id FROM fines WHERE zone_id = $1 LIMIT $2 OFFSET $3"
+	rows, err := d.db.Query(ctx, query, zoneId, limit, offset)
+	if err != nil {
+		fmt.Printf("db error: %v\n", err.Error())
+		return []api.FineResponse{}
+	}
+	defer rows.Close()
+
+	fines := []api.FineResponse{}
+	for rows.Next() {
+		var fine api.FineResponse
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid, &fine.ZoneId); err != nil {
+			fmt.Printf("row scan error: %v\n", err.Error())
+			continue
+		}
+		fines = append(fines, fine)
+	}
+
+	return fines
 }

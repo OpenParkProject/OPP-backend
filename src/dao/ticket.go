@@ -102,9 +102,9 @@ func (d *TicketDao) GetTicketById(c context.Context, id int64) (*api.TicketRespo
 	return &ticket, nil
 }
 
-func (d *TicketDao) AddCarTicket(c context.Context, plate string, ticket api.TicketRequest) (*api.TicketResponse, error) {
+func (d *TicketDao) CreateZoneTicket(c context.Context, zoneId int64, ticket api.TicketRequest) (*api.TicketResponse, error) {
 	carQuery := "SELECT * FROM cars WHERE plate = $1"
-	carRows, err := d.db.Query(c, carQuery, plate)
+	carRows, err := d.db.Query(c, carQuery, ticket.Plate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check car: %w", err)
 	}
@@ -117,7 +117,7 @@ func (d *TicketDao) AddCarTicket(c context.Context, plate string, ticket api.Tic
 	endTime := ticket.StartDate.Add(time.Duration(ticket.Duration) * time.Minute)
 
 	// Price calculation based on zone
-	zone, err := NewZoneDao().GetZoneById(c, ticket.ZoneId)
+	zone, err := NewZoneDao().GetZoneById(c, zoneId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get zone: %w", err)
 	}
@@ -129,20 +129,20 @@ func (d *TicketDao) AddCarTicket(c context.Context, plate string, ticket api.Tic
 	creationTime := time.Now()
 	query := "INSERT INTO tickets (plate, start_date, end_date, price, paid, creation_time, zone_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
 	var lastId int64
-	err = d.db.QueryRow(c, query, plate, ticket.StartDate, endTime, price, false, creationTime, ticket.ZoneId).Scan(&lastId)
+	err = d.db.QueryRow(c, query, ticket.Plate, ticket.StartDate, endTime, price, false, creationTime, zoneId).Scan(&lastId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add ticket: %w", err)
 	}
 
 	return &api.TicketResponse{
 		Id:           lastId,
-		Plate:        plate,
+		Plate:        ticket.Plate,
 		StartDate:    ticket.StartDate,
 		EndDate:      endTime,
 		Price:        price,
 		Paid:         false,
 		CreationTime: creationTime,
-		ZoneId:       ticket.ZoneId,
+		ZoneId:       zoneId,
 	}, nil
 }
 
@@ -246,4 +246,24 @@ func (d *TicketDao) DeleteTicketById(c context.Context, username string, id int6
 	}
 
 	return nil
+}
+
+func (d *FineDao) GetZoneTickets(ctx context.Context, zoneId int64, limit int, offset int) []api.TicketResponse {
+	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time, zone_id FROM tickets WHERE zone_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3"
+	rows, err := d.db.Query(ctx, query, zoneId, limit, offset)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	tickets := []api.TicketResponse{}
+	for rows.Next() {
+		var ticket api.TicketResponse
+		if err := rows.Scan(&ticket.Id, &ticket.Plate, &ticket.StartDate, &ticket.EndDate, &ticket.Price, &ticket.Paid, &ticket.CreationTime, &ticket.ZoneId); err != nil {
+			continue
+		}
+		tickets = append(tickets, ticket)
+	}
+
+	return tickets
 }

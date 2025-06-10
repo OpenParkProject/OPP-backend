@@ -544,3 +544,74 @@ func (z *ZoneDao) RemoveUserFromZone(c context.Context, zoneId int64, username s
 
 	return nil
 }
+
+func (z *ZoneDao) CheckUserZonePermission(c context.Context, zoneId int64, username string) (string, error) {
+	query := `
+				SELECT role 
+				FROM zone_user_roles 
+				WHERE zone_id = $1 AND user_id = $2
+		`
+
+	row := z.db.QueryRow(c, query, zoneId, username)
+
+	var role string
+	if err := row.Scan(&role); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrZoneUserRoleNotFound
+		}
+		return "", fmt.Errorf("failed to check user zone permission: %w", err)
+	}
+
+	return role, nil
+}
+
+func (z *ZoneDao) GetUserZones(c context.Context, username string) ([]api.ZoneResponse, error) {
+	query := `
+		SELECT 
+			z.id, 
+			z.name, 
+			z.available, 
+			ST_AsGeoJSON(z.geometry) as geometry, 
+			z.metadata, 
+			z.created_at, 
+			z.updated_at, 
+			z.price_offset, 
+			z.price_lin, 
+			z.price_exp
+		FROM zones z
+		JOIN zone_user_roles zur ON z.id = zur.zone_id
+		WHERE zur.user_id = $1
+	`
+
+	rows, err := z.db.Query(c, query, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user zones: %w", err)
+	}
+	defer rows.Close()
+
+	var zones []api.ZoneResponse
+	for rows.Next() {
+		var zone api.ZoneResponse
+		var geometryJSON string
+
+		if err := rows.Scan(
+			&zone.Id,
+			&zone.Name,
+			&zone.Available,
+			&geometryJSON,
+			&zone.Metadata,
+			&zone.CreatedAt,
+			&zone.UpdatedAt,
+			&zone.PriceOffset,
+			&zone.PriceLin,
+			&zone.PriceExp,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan user zone: %w", err)
+		}
+
+		zone.Geometry = geometryJSON
+		zones = append(zones, zone)
+	}
+
+	return zones, nil
+}

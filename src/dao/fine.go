@@ -27,7 +27,7 @@ func NewFineDao() *FineDao {
 }
 
 func (d *FineDao) GetFines(c context.Context, limit *int, offset *int) []api.FineResponse {
-	query := "SELECT id, plate, amount, date, paid FROM fines LIMIT $1 OFFSET $2"
+	query := "SELECT id, plate, amount, date, paid, zone_id FROM fines LIMIT $1 OFFSET $2"
 	params := []any{20, 0}
 	if limit != nil {
 		params[0] = *limit
@@ -46,7 +46,7 @@ func (d *FineDao) GetFines(c context.Context, limit *int, offset *int) []api.Fin
 
 	for rows.Next() {
 		var fine api.FineResponse
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid, &fine.ZoneId); err != nil {
 			fmt.Printf("row scan error: %v\n", err.Error())
 			continue
 		}
@@ -57,7 +57,7 @@ func (d *FineDao) GetFines(c context.Context, limit *int, offset *int) []api.Fin
 }
 
 func (d *FineDao) GetCarFines(c context.Context, plate string) []api.FineResponse {
-	query := "SELECT id, plate, amount, date, paid FROM fines WHERE plate = $1"
+	query := "SELECT id, plate, amount, date, paid, zone_id FROM fines WHERE plate = $1"
 	rows, err := d.db.Query(c, query, plate)
 	if err != nil {
 		fmt.Printf("db error: %v\n", err.Error())
@@ -68,7 +68,7 @@ func (d *FineDao) GetCarFines(c context.Context, plate string) []api.FineRespons
 	fines := []api.FineResponse{}
 	for rows.Next() {
 		var fine api.FineResponse
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid, &fine.ZoneId); err != nil {
 			fmt.Printf("row scan error: %v\n", err.Error())
 			continue
 		}
@@ -90,10 +90,18 @@ func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineReque
 		return nil, ErrCarNotFound
 	}
 
-	query := "INSERT INTO fines (plate, amount, date, paid) VALUES ($1, $2, $3, FALSE) RETURNING id"
+	res, err := NewZoneDao().ZoneExists(c, fine.ZoneId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check zone existence: %w", err)
+	}
+	if !res {
+		return nil, fmt.Errorf("zone with ID %d does not exist", fine.ZoneId)
+	}
+
+	query := "INSERT INTO fines (plate, amount, date, paid, zone_id) VALUES ($1, $2, $3, FALSE, $4) RETURNING id"
 	currentDate := time.Now()
 	var lastId int64
-	err = d.db.QueryRow(c, query, plate, fine.Amount, currentDate).Scan(&lastId)
+	err = d.db.QueryRow(c, query, plate, fine.Amount, currentDate, fine.ZoneId).Scan(&lastId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add fine: %w", err)
 	}
@@ -104,11 +112,12 @@ func (d *FineDao) AddCarFine(c context.Context, plate string, fine api.FineReque
 		Amount: fine.Amount,
 		Date:   currentDate,
 		Paid:   false,
+		ZoneId: fine.ZoneId,
 	}, nil
 }
 
 func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineResponse, error) {
-	query := "SELECT f.id, f.plate, f.amount, f.date, f.paid FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_username = $1"
+	query := "SELECT f.id, f.plate, f.amount, f.date, f.paid, f.zone_id FROM fines f JOIN cars c ON f.plate = c.plate WHERE c.user_id = $1"
 	rows, err := d.db.Query(c, query, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user fines: %w", err)
@@ -118,7 +127,7 @@ func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineRe
 	fines := []api.FineResponse{}
 	for rows.Next() {
 		var fine api.FineResponse
-		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid); err != nil {
+		if err := rows.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid, &fine.ZoneId); err != nil {
 			return nil, fmt.Errorf("row scan error: %w", err)
 		}
 		fines = append(fines, fine)
@@ -128,11 +137,11 @@ func (d *FineDao) GetUserFines(c context.Context, username string) ([]api.FineRe
 }
 
 func (d *FineDao) GetFineById(c context.Context, id int64) (*api.FineResponse, error) {
-	query := "SELECT id, plate, amount, date, paid FROM fines WHERE id = $1"
+	query := "SELECT id, plate, amount, date, paid, zone_id FROM fines WHERE id = $1"
 	row := d.db.QueryRow(c, query, id)
 
 	var fine api.FineResponse
-	if err := row.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid); err != nil {
+	if err := row.Scan(&fine.Id, &fine.Plate, &fine.Amount, &fine.Date, &fine.Paid, &fine.ZoneId); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrFineNotFound
 		}

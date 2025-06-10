@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -24,6 +25,12 @@ var DEBUG_MODE = os.Getenv("DEBUG_MODE")
 // URL to the public key set for JWT validation
 var AUTH_URL = os.Getenv("AUTH_URL")
 var PUBKEY_ENDPOINT = os.Getenv("PUBKEY_ENDPOINT")
+
+var (
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrFailedToGetUser = errors.New("failed to get user from context")
+	ErrFailedToGetRole = errors.New("failed to get role from context")
+)
 
 // fetchPubKey fetches the public key set from the auth service
 func fetchPubKey(url string) (*rsa.PublicKey, error) {
@@ -155,4 +162,31 @@ func AuthenticationFunc(ctx context.Context, input *openapi3filter.Authenticatio
 	*req = *req.WithContext(ctx)
 
 	return nil
+}
+
+func GetPermissions(c *gin.Context) (string, string, error) {
+	// Auth middleware sets values in request context
+	// not in gin context
+	username := c.Request.Context().Value("username")
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": ErrUnauthorized.Error()})
+		return "", "", ErrUnauthorized
+	}
+	usernameStr, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": ErrFailedToGetUser.Error()})
+		return "", "", ErrFailedToGetUser
+	}
+	role := c.Request.Context().Value("role")
+	if role == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": ErrUnauthorized.Error()})
+		return "", "", ErrUnauthorized
+	}
+	roleStr, ok := role.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": ErrFailedToGetRole.Error()})
+		return "", "", ErrFailedToGetRole
+	}
+
+	return usernameStr, roleStr, nil
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"OPP/backend/api"
+	"OPP/backend/auth"
 	"OPP/backend/dao"
 	"errors"
 	"net/http"
@@ -20,27 +21,11 @@ func NewFineHandler() *FineHandlers {
 }
 
 func (fh *FineHandlers) GetFines(c *gin.Context, params api.GetFinesParams) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" && roleStr != "controller" {
+	if role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -50,27 +35,11 @@ func (fh *FineHandlers) GetFines(c *gin.Context, params api.GetFinesParams) {
 }
 
 func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" && roleStr != "controller" {
+	if role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -80,6 +49,15 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 }
 
 func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+	if role != "admin" && role != "controller" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
 	var fineRequest api.FineRequest
 	if err := c.ShouldBindJSON(&fineRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
@@ -100,27 +78,11 @@ func (fh *FineHandlers) AddCarFine(c *gin.Context, plate string) {
 }
 
 func (fh *FineHandlers) DeleteFines(c *gin.Context) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	rolestr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if rolestr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -133,28 +95,12 @@ func (fh *FineHandlers) DeleteFines(c *gin.Context) {
 }
 
 func (fh *FineHandlers) GetUserFines(c *gin.Context) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	usernamestr, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	_, ok = role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+	username, _, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
 
-	fines, err := fh.dao.GetUserFines(c.Request.Context(), usernamestr)
+	fines, err := fh.dao.GetUserFines(c.Request.Context(), username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user fines"})
 		return
@@ -163,27 +109,11 @@ func (fh *FineHandlers) GetUserFines(c *gin.Context) {
 }
 
 func (fh *FineHandlers) GetFineById(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	rolestr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if rolestr != "admin" && rolestr != "controller" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -202,28 +132,12 @@ func (fh *FineHandlers) GetFineById(c *gin.Context, id int64) {
 }
 
 func (fh *FineHandlers) DeleteFineById(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	rolestr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	// Check if the user has permission to delete the fine
-	if rolestr != "admin" && rolestr != "controller" {
+
+	if role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -240,24 +154,8 @@ func (fh *FineHandlers) DeleteFineById(c *gin.Context, id int64) {
 }
 
 func (fh *FineHandlers) PayFine(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	_, ok = role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
+	_, _, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
 

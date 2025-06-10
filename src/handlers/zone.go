@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"OPP/backend/api"
+	"OPP/backend/auth"
 	"OPP/backend/dao"
 	"errors"
 	"net/http"
@@ -30,27 +31,11 @@ func (zh *ZoneHandlers) GetZones(c *gin.Context, params api.GetZonesParams) {
 }
 
 func (zh *ZoneHandlers) CreateZone(c *gin.Context) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -93,27 +78,11 @@ func (zh *ZoneHandlers) GetZoneById(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -142,32 +111,16 @@ func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) DeleteZoneById(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	err := zh.dao.DeleteZoneById(c.Request.Context(), id)
+	err = zh.dao.DeleteZoneById(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, dao.ErrZoneNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
@@ -195,32 +148,16 @@ func (zh *ZoneHandlers) GetZoneByLocation(c *gin.Context, params api.GetZoneByLo
 }
 
 func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	_, err := zh.dao.GetZoneById(c.Request.Context(), id)
+	_, err = zh.dao.GetZoneById(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, dao.ErrZoneNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
@@ -245,32 +182,16 @@ func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
-	username := c.Request.Context().Value("username")
-	if username == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	username, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	usernameStr, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	_, err := zh.dao.GetZoneById(c.Request.Context(), id)
+	_, err = zh.dao.GetZoneById(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, dao.ErrZoneNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
@@ -291,7 +212,7 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 		return
 	}
 
-	userRole, err := zh.dao.AddUserToZone(c.Request.Context(), id, request, usernameStr)
+	userRole, err := zh.dao.AddUserToZone(c.Request.Context(), id, request, username)
 	if err != nil {
 		if errors.Is(err, dao.ErrZoneUserRoleAlreadyExists) {
 			c.JSON(http.StatusConflict, gin.H{"error": "user already in zone"})

@@ -69,7 +69,7 @@ func (th *TicketHandlers) GetTicketById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" && role != "controller" {
+	if role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}

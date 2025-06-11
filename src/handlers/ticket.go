@@ -47,7 +47,7 @@ func (th *TicketHandlers) GetTickets(c *gin.Context, params api.GetTicketsParams
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -61,7 +61,7 @@ func (th *TicketHandlers) GetTicketById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" && role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -116,6 +116,15 @@ func (th *TicketHandlers) CreateZoneTicket(c *gin.Context, zoneId int64) {
 }
 
 func (th *TicketHandlers) GetCarTickets(c *gin.Context, plate string) {
+	_, role, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+	if role != "superuser" && role != "admin" && role != "controller" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
 	tickets, err := th.dao.GetCarTickets(c.Request.Context(), plate)
 	if err != nil {
 		if errors.Is(err, dao.ErrCarNotFound) {
@@ -190,17 +199,12 @@ func (th *TicketHandlers) DeleteTicketById(c *gin.Context, id int64) {
 }
 
 func (fh *FineHandlers) GetZoneTickets(c *gin.Context, zoneId int64, params api.GetZoneTicketsParams) {
-	username, _, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-
-	role, err := dao.NewZoneDao().CheckUserZonePermission(c.Request.Context(), zoneId, username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check zone permissions"})
-		return
-	}
-	if role != "admin" && role != "controller" {
+	zh := NewZoneHandler()
+	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}

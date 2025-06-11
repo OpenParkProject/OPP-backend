@@ -545,26 +545,6 @@ func (z *ZoneDao) RemoveUserFromZone(c context.Context, zoneId int64, username s
 	return nil
 }
 
-func (z *ZoneDao) CheckUserZonePermission(c context.Context, zoneId int64, username string) (string, error) {
-	query := `
-				SELECT role 
-				FROM zone_user_roles 
-				WHERE zone_id = $1 AND user_id = $2
-		`
-
-	row := z.db.QueryRow(c, query, zoneId, username)
-
-	var role string
-	if err := row.Scan(&role); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrZoneUserRoleNotFound
-		}
-		return "", fmt.Errorf("failed to check user zone permission: %w", err)
-	}
-
-	return role, nil
-}
-
 func (z *ZoneDao) GetUserZones(c context.Context, username string) ([]api.ZoneResponse, error) {
 	query := `
 		SELECT 
@@ -614,4 +594,33 @@ func (z *ZoneDao) GetUserZones(c context.Context, username string) ([]api.ZoneRe
 	}
 
 	return zones, nil
+}
+
+func (z *ZoneDao) GetZoneUserRole(c context.Context, zoneId int64, username string) (*api.ZoneUserRoleResponse, error) {
+	query := `
+		SELECT 
+			*
+		FROM zone_user_roles
+		WHERE zone_id = $1 AND user_id = $2
+	`
+
+	row := z.db.QueryRow(c, query, zoneId, username)
+
+	var role api.ZoneUserRoleResponse
+	if err := row.Scan(
+		&role.Id,
+		&role.ZoneId,
+		&role.Username,
+		&role.Role,
+		&role.AssignedAt,
+		&role.AssignedBy,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrZoneUserRoleNotFound
+		}
+		return nil, fmt.Errorf("failed to get zone user role: %w", err)
+	}
+	role.ZoneId = zoneId
+	role.Username = username
+	return &role, nil
 }

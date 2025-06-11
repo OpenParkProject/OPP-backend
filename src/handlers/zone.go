@@ -20,6 +20,32 @@ func NewZoneHandler() *ZoneHandlers {
 	}
 }
 
+func (zh *ZoneHandlers) isZoneAdmin(c *gin.Context, zoneId int64, username string) bool {
+	ZoneUserRole, err := zh.dao.GetZoneUserRole(c.Request.Context(), zoneId, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user roles"})
+		return false
+	}
+	if ZoneUserRole.Role == "admin" {
+		return true
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	return false
+}
+
+func (zh *ZoneHandlers) isZoneController(c *gin.Context, zoneId int64, username string) bool {
+	ZoneUserRole, err := zh.dao.GetZoneUserRole(c.Request.Context(), zoneId, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user roles"})
+		return false
+	}
+	if ZoneUserRole.Role == "controller" {
+		return true
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	return false
+}
+
 func (zh *ZoneHandlers) GetZones(c *gin.Context, params api.GetZonesParams) {
 	zones, err := zh.dao.GetAllZones(c.Request.Context())
 	if err != nil {
@@ -31,11 +57,11 @@ func (zh *ZoneHandlers) GetZones(c *gin.Context, params api.GetZonesParams) {
 }
 
 func (zh *ZoneHandlers) CreateZone(c *gin.Context) {
-	_, role, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" && role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -60,6 +86,24 @@ func (zh *ZoneHandlers) CreateZone(c *gin.Context) {
 		return
 	}
 
+	// Automatically add the creator as an admin of the new zone
+	userRole := api.ZoneUserRoleRequest{
+		Username: username,
+		Role:     "admin",
+	}
+	if _, err := zh.dao.AddUserToZone(c.Request.Context(), zone.Id, userRole, username); err != nil {
+		if errors.Is(err, dao.ErrZoneUserRoleAlreadyExists) {
+			c.JSON(http.StatusConflict, gin.H{"error": "user already in zone"})
+			return
+		}
+		if errors.Is(err, dao.ErrZoneNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add user to zone"})
+		return
+	}
+
 	c.JSON(http.StatusCreated, zone)
 }
 
@@ -78,11 +122,11 @@ func (zh *ZoneHandlers) GetZoneById(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
-	_, role, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "admin" || !zh.isZoneAdmin(c, id, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -111,11 +155,11 @@ func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) DeleteZoneById(c *gin.Context, id int64) {
-	_, role, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -148,11 +192,11 @@ func (zh *ZoneHandlers) GetZoneByLocation(c *gin.Context, params api.GetZoneByLo
 }
 
 func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
-	_, role, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -186,7 +230,7 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -230,32 +274,16 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 }
 
 func (zh *ZoneHandlers) RemoveZoneUserRole(c *gin.Context, id int64, username string) {
-	logged_user := c.Request.Context().Value("username")
-	if logged_user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	username, role, err := auth.GetPermissions(c)
+	if err != nil {
 		return
 	}
-	_, ok := logged_user.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username"})
-		return
-	}
-	role := c.Request.Context().Value("role")
-	if role == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	roleStr, ok := role.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get role"})
-		return
-	}
-	if roleStr != "admin" {
+	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	_, err := zh.dao.GetZoneById(c.Request.Context(), id)
+	_, err = zh.dao.GetZoneById(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, dao.ErrZoneNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})

@@ -25,7 +25,7 @@ func (fh *FineHandlers) GetFines(c *gin.Context, params api.GetFinesParams) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -39,7 +39,7 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -49,11 +49,12 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 }
 
 func (fh *FineHandlers) CreateZoneFine(c *gin.Context, zoneId int64) {
-	_, role, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-	if role != "admin" && role != "controller" {
+	zh := NewZoneHandler()
+	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -82,7 +83,7 @@ func (fh *FineHandlers) DeleteFines(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -113,7 +114,7 @@ func (fh *FineHandlers) GetFineById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" && role != "controller" {
+	if role != "superuser" && role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -137,7 +138,7 @@ func (fh *FineHandlers) DeleteFineById(c *gin.Context, id int64) {
 		return
 	}
 
-	if role != "admin" && role != "controller" {
+	if role != "superuser" && role != "admin" && role != "controller" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -172,17 +173,12 @@ func (fh *FineHandlers) PayFine(c *gin.Context, id int64) {
 }
 
 func (fh *FineHandlers) GetZoneFines(c *gin.Context, zoneId int64, params api.GetZoneFinesParams) {
-	username, _, err := auth.GetPermissions(c)
+	username, role, err := auth.GetPermissions(c)
 	if err != nil {
 		return
 	}
-
-	role, err := dao.NewZoneDao().CheckUserZonePermission(c.Request.Context(), zoneId, username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check zone permissions"})
-		return
-	}
-	if role != "admin" && role != "controller" {
+	zh := NewZoneHandler()
+	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}

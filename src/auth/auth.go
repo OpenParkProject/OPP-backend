@@ -114,8 +114,8 @@ func AuthenticationFunc(ctx context.Context, input *openapi3filter.Authenticatio
 
 	// Bypass authentication in debug mode
 	if DEBUG_MODE == "true" {
-		ctx = context.WithValue(ctx, "username", "anonymous")
-		ctx = context.WithValue(ctx, "role", "admin")
+		ctx = context.WithValue(ctx, "username", "superuser_debug")
+		ctx = context.WithValue(ctx, "role", "superuser")
 		*req = *req.WithContext(ctx)
 		return nil
 	}

@@ -26,7 +26,7 @@ func (ch *CarHandlers) DeleteCars(c *gin.Context) {
 		return
 	}
 
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -43,7 +43,7 @@ func (ch *CarHandlers) GetCars(c *gin.Context, params api.GetCarsParams) {
 	if err != nil {
 		return
 	}
-	if role != "admin" {
+	if role != "superuser" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}

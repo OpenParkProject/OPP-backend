@@ -64,3 +64,14 @@ CREATE TABLE IF NOT EXISTS fines (
     FOREIGN KEY (plate) REFERENCES cars(plate) ON DELETE CASCADE,
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
+
+-- Totems table
+CREATE TABLE IF NOT EXISTS totems (
+    id TEXT PRIMARY KEY,
+    zone_id INTEGER NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    location GEOMETRY(POINT, 4326) GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)) STORED,
+    registration_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);

@@ -248,11 +248,11 @@ func (d *TicketDao) DeleteTicketById(c context.Context, username string, id int6
 	return nil
 }
 
-func (d *FineDao) GetZoneTickets(ctx context.Context, zoneId int64, limit int, offset int) []api.TicketResponse {
+func (d *FineDao) GetZoneTickets(ctx context.Context, zoneId int64, limit int, offset int) ([]api.TicketResponse, error) {
 	query := "SELECT id, plate, start_date, end_date, price, paid, creation_time, zone_id FROM tickets WHERE zone_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3"
 	rows, err := d.db.Query(ctx, query, zoneId, limit, offset)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -265,5 +265,5 @@ func (d *FineDao) GetZoneTickets(ctx context.Context, zoneId int64, limit int, o
 		tickets = append(tickets, ticket)
 	}
 
-	return tickets
+	return tickets, nil
 }

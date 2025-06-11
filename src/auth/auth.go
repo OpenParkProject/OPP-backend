@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -25,6 +26,9 @@ var DEBUG_MODE = os.Getenv("DEBUG_MODE")
 // URL to the public key set for JWT validation
 var AUTH_URL = os.Getenv("AUTH_URL")
 var PUBKEY_ENDPOINT = os.Getenv("PUBKEY_ENDPOINT")
+
+// URL to the OTP validation endpoint
+var OTP_ENDPOINT = os.Getenv("OTP_ENDPOINT")
 
 var (
 	ErrUnauthorized    = errors.New("unauthorized")
@@ -189,4 +193,22 @@ func GetPermissions(c *gin.Context) (string, string, error) {
 	}
 
 	return usernameStr, roleStr, nil
+}
+
+func ValidateOTP(otp string) error {
+	if DEBUG_MODE == "true" {
+		return nil // Bypass OTP validation in debug mode
+	}
+
+	resp, err := http.PostForm(AUTH_URL+OTP_ENDPOINT, url.Values{"otp": {otp}})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("OTP validation failed: %s", resp.Status)
+	}
+
+	return nil
 }

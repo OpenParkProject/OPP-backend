@@ -204,11 +204,28 @@ func (fh *FineHandlers) GetZoneTickets(c *gin.Context, zoneId int64, params api.
 		return
 	}
 	zh := NewZoneHandler()
-	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
+	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
+	isController, errController := zh.isZoneController(c, zoneId, username)
+
+	if role != "superuser" && (errAdmin != nil || !isAdmin) && (errController != nil || !isController) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	fines := fh.dao.GetZoneTickets(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
-	c.JSON(http.StatusOK, fines)
+	tickets, err := fh.dao.GetZoneTickets(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
+	if err != nil {
+		if errors.Is(err, dao.ErrZoneNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get zone tickets"})
+		return
+	}
+
+	if tickets == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+
+	c.JSON(http.StatusOK, tickets)
 }

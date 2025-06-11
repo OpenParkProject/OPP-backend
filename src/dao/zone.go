@@ -618,7 +618,7 @@ func (z *ZoneDao) GetZoneUserRole(c context.Context, zoneId int64, username stri
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrZoneUserRoleNotFound
 		}
-		return nil, fmt.Errorf("failed to get zone user role: %w", err)
+		return nil, err
 	}
 	role.ZoneId = zoneId
 	role.Username = username

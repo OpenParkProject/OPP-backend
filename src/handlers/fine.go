@@ -54,8 +54,9 @@ func (fh *FineHandlers) CreateZoneFine(c *gin.Context, zoneId int64) {
 		return
 	}
 	zh := NewZoneHandler()
-	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
+	isController, errController := zh.isZoneController(c, zoneId, username)
+	if role != "superuser" || !isAdmin || !isController || errAdmin != nil || errController != nil {
 		return
 	}
 
@@ -178,8 +179,9 @@ func (fh *FineHandlers) GetZoneFines(c *gin.Context, zoneId int64, params api.Ge
 		return
 	}
 	zh := NewZoneHandler()
-	if role != "superuser" || !zh.isZoneAdmin(c, zoneId, username) || !zh.isZoneController(c, zoneId, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
+	isController, errController := zh.isZoneController(c, zoneId, username)
+	if role != "superuser" || !isAdmin || !isController || errAdmin != nil || errController != nil {
 		return
 	}
 

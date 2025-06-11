@@ -20,30 +20,37 @@ func NewZoneHandler() *ZoneHandlers {
 	}
 }
 
-func (zh *ZoneHandlers) isZoneAdmin(c *gin.Context, zoneId int64, username string) bool {
+// TODO: move response handling outside
+func (zh *ZoneHandlers) isZoneAdmin(c *gin.Context, zoneId int64, username string) (bool, error) {
 	ZoneUserRole, err := zh.dao.GetZoneUserRole(c.Request.Context(), zoneId, username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user roles"})
-		return false
+	if err != nil && !errors.Is(err, dao.ErrZoneUserRoleNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get zone user role"})
+		return false, err
+	}
+	if errors.Is(err, dao.ErrZoneUserRoleNotFound) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "user not found in zone"})
+		return false, nil
 	}
 	if ZoneUserRole.Role == "admin" {
-		return true
+		return true, nil
 	}
-	c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-	return false
+	return false, nil
 }
 
-func (zh *ZoneHandlers) isZoneController(c *gin.Context, zoneId int64, username string) bool {
+func (zh *ZoneHandlers) isZoneController(c *gin.Context, zoneId int64, username string) (bool, error) {
 	ZoneUserRole, err := zh.dao.GetZoneUserRole(c.Request.Context(), zoneId, username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user roles"})
-		return false
+	if err != nil && !errors.Is(err, dao.ErrZoneUserRoleNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get zone user role"})
+		return false, err
+	}
+	if errors.Is(err, dao.ErrZoneUserRoleNotFound) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "user not found in zone"})
+		return false, nil
 	}
 	if ZoneUserRole.Role == "controller" {
-		return true
+		return true, nil
 	}
-	c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-	return false
+	return false, nil
 }
 
 func (zh *ZoneHandlers) GetZones(c *gin.Context, params api.GetZonesParams) {
@@ -92,14 +99,6 @@ func (zh *ZoneHandlers) CreateZone(c *gin.Context) {
 		Role:     "admin",
 	}
 	if _, err := zh.dao.AddUserToZone(c.Request.Context(), zone.Id, userRole, username); err != nil {
-		if errors.Is(err, dao.ErrZoneUserRoleAlreadyExists) {
-			c.JSON(http.StatusConflict, gin.H{"error": "user already in zone"})
-			return
-		}
-		if errors.Is(err, dao.ErrZoneNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add user to zone"})
 		return
 	}
@@ -126,8 +125,8 @@ func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "admin" || !zh.isZoneAdmin(c, id, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	isAdmin, err := zh.isZoneAdmin(c, id, username)
+	if role != "admin" || !isAdmin || err != nil {
 		return
 	}
 
@@ -159,8 +158,8 @@ func (zh *ZoneHandlers) DeleteZoneById(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	isAdmin, err := zh.isZoneAdmin(c, id, username)
+	if role != "superuser" || !isAdmin || err != nil {
 		return
 	}
 
@@ -196,10 +195,6 @@ func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
 
 	_, err = zh.dao.GetZoneById(c.Request.Context(), id)
 	if err != nil {
@@ -208,6 +203,11 @@ func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check if zone exists"})
+		return
+	}
+
+	isAdmin, err := zh.isZoneAdmin(c, id, username)
+	if role != "superuser" || !isAdmin || err != nil {
 		return
 	}
 
@@ -259,8 +259,8 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 			return
 		}
 	} else if request.Role == "controller" {
-		if role != "superuser" && !zh.isZoneAdmin(c, id, username) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		isAdmin, err := zh.isZoneAdmin(c, id, username)
+		if role != "superuser" && (!isAdmin || err != nil) || err != nil {
 			return
 		}
 	}
@@ -287,8 +287,8 @@ func (zh *ZoneHandlers) RemoveZoneUserRole(c *gin.Context, id int64, username st
 	if err != nil {
 		return
 	}
-	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	isAdmin, err := zh.isZoneAdmin(c, id, username)
+	if role != "superuser" || !isAdmin || err != nil {
 		return
 	}
 

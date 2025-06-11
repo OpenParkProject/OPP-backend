@@ -230,10 +230,6 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 	if err != nil {
 		return
 	}
-	if role != "superuser" || !zh.isZoneAdmin(c, id, username) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
 
 	_, err = zh.dao.GetZoneById(c.Request.Context(), id)
 	if err != nil {
@@ -254,6 +250,19 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 	if request.Role != "admin" && request.Role != "controller" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be either 'admin' or 'controller'"})
 		return
+	}
+
+	// Check permissions
+	if request.Role == "admin" {
+		if role != "superuser" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else if request.Role == "controller" {
+		if role != "superuser" && !zh.isZoneAdmin(c, id, username) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
 	}
 
 	userRole, err := zh.dao.AddUserToZone(c.Request.Context(), id, request, username)
@@ -319,4 +328,7 @@ func (zh *ZoneHandlers) GetUserZones(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, zones)
+}
+
+func (zh *ZoneHandlers) GetUserZonesByOtp(c *gin.Context, otp api.GetUserZonesByOtpParams) {
 }

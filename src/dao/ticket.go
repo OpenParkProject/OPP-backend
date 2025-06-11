@@ -223,7 +223,7 @@ func (d *TicketDao) DeleteTicketById(c context.Context, username string, id int6
 	}
 
 	// Check if the user owns the ticket
-	query := "SELECT 1 FROM cars WHERE plate = $1 AND user_username = $2"
+	query := "SELECT 1 FROM cars WHERE plate = $1 AND user_id = $2"
 	rows, err := d.db.Query(c, query, ticket.Plate, username)
 	if err != nil {
 		return fmt.Errorf("failed to check ticket ownership: %w", err)

@@ -79,6 +79,38 @@ func (th *TicketHandlers) GetTicketById(c *gin.Context, id int64) {
 	c.JSON(http.StatusOK, ticket)
 }
 
+func (fh *FineHandlers) GetZoneTickets(c *gin.Context, zoneId int64, params api.GetZoneTicketsParams) {
+	username, role, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+	zh := NewZoneHandler()
+	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
+	isController, errController := zh.isZoneController(c, zoneId, username)
+
+	if role != "superuser" && (errAdmin != nil || !isAdmin) && (errController != nil || !isController) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	tickets, err := fh.dao.GetZoneTickets(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
+	if err != nil {
+		if errors.Is(err, dao.ErrZoneNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get zone tickets"})
+		return
+	}
+
+	if tickets == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+
+	c.JSON(http.StatusOK, tickets)
+}
+
 func (th *TicketHandlers) CreateZoneTicket(c *gin.Context, zoneId int64) {
 	var ticketRequest api.TicketRequest
 	if err := c.ShouldBindJSON(&ticketRequest); err != nil {
@@ -196,36 +228,4 @@ func (th *TicketHandlers) DeleteTicketById(c *gin.Context, id int64) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "ticket deleted successfully"})
-}
-
-func (fh *FineHandlers) GetZoneTickets(c *gin.Context, zoneId int64, params api.GetZoneTicketsParams) {
-	username, role, err := auth.GetPermissions(c)
-	if err != nil {
-		return
-	}
-	zh := NewZoneHandler()
-	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
-	isController, errController := zh.isZoneController(c, zoneId, username)
-
-	if role != "superuser" && (errAdmin != nil || !isAdmin) && (errController != nil || !isController) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
-	tickets, err := fh.dao.GetZoneTickets(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
-	if err != nil {
-		if errors.Is(err, dao.ErrZoneNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get zone tickets"})
-		return
-	}
-
-	if tickets == nil {
-		c.JSON(http.StatusOK, []interface{}{})
-		return
-	}
-
-	c.JSON(http.StatusOK, tickets)
 }

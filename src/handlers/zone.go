@@ -126,7 +126,7 @@ func (zh *ZoneHandlers) UpdateZoneById(c *gin.Context, id int64) {
 		return
 	}
 	isAdmin, err := zh.isZoneAdmin(c, id, username)
-	if role != "admin" || !isAdmin || err != nil {
+	if role != "superuser" && (!isAdmin || err != nil) {
 		return
 	}
 
@@ -159,7 +159,7 @@ func (zh *ZoneHandlers) DeleteZoneById(c *gin.Context, id int64) {
 		return
 	}
 	isAdmin, err := zh.isZoneAdmin(c, id, username)
-	if role != "superuser" || !isAdmin || err != nil {
+	if role != "superuser" && (!isAdmin || err != nil) {
 		return
 	}
 
@@ -207,7 +207,7 @@ func (zh *ZoneHandlers) GetZoneUsers(c *gin.Context, id int64) {
 	}
 
 	isAdmin, err := zh.isZoneAdmin(c, id, username)
-	if role != "superuser" || !isAdmin || err != nil {
+	if role != "superuser" && (!isAdmin || err != nil) {
 		return
 	}
 
@@ -260,7 +260,7 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 		}
 	} else if request.Role == "controller" {
 		isAdmin, err := zh.isZoneAdmin(c, id, username)
-		if role != "superuser" && (!isAdmin || err != nil) || err != nil {
+		if role != "superuser" && (!isAdmin || err != nil) {
 			return
 		}
 	}
@@ -288,7 +288,7 @@ func (zh *ZoneHandlers) RemoveZoneUserRole(c *gin.Context, id int64, username st
 		return
 	}
 	isAdmin, err := zh.isZoneAdmin(c, id, username)
-	if role != "superuser" || !isAdmin || err != nil {
+	if role != "superuser" && (!isAdmin || err != nil) {
 		return
 	}
 

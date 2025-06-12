@@ -48,6 +48,22 @@ func (fh *FineHandlers) GetCarFines(c *gin.Context, plate string) {
 	c.JSON(http.StatusOK, fines)
 }
 
+func (fh *FineHandlers) GetZoneFines(c *gin.Context, zoneId int64, params api.GetZoneFinesParams) {
+	username, role, err := auth.GetPermissions(c)
+	if err != nil {
+		return
+	}
+	zh := NewZoneHandler()
+	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
+	isController, errController := zh.isZoneController(c, zoneId, username)
+	if role != "superuser" && !isAdmin && !isController && errAdmin != nil && errController != nil {
+		return
+	}
+
+	fines := fh.dao.GetZoneFines(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
+	c.JSON(http.StatusOK, fines)
+}
+
 func (fh *FineHandlers) CreateZoneFine(c *gin.Context, zoneId int64) {
 	username, role, err := auth.GetPermissions(c)
 	if err != nil {
@@ -56,7 +72,7 @@ func (fh *FineHandlers) CreateZoneFine(c *gin.Context, zoneId int64) {
 	zh := NewZoneHandler()
 	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
 	isController, errController := zh.isZoneController(c, zoneId, username)
-	if role != "superuser" || !isAdmin || !isController || errAdmin != nil || errController != nil {
+	if role != "superuser" && !isAdmin && !isController && errAdmin != nil && errController != nil {
 		return
 	}
 
@@ -171,20 +187,4 @@ func (fh *FineHandlers) PayFine(c *gin.Context, id int64) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "fine paid successfully"})
-}
-
-func (fh *FineHandlers) GetZoneFines(c *gin.Context, zoneId int64, params api.GetZoneFinesParams) {
-	username, role, err := auth.GetPermissions(c)
-	if err != nil {
-		return
-	}
-	zh := NewZoneHandler()
-	isAdmin, errAdmin := zh.isZoneAdmin(c, zoneId, username)
-	isController, errController := zh.isZoneController(c, zoneId, username)
-	if role != "superuser" || !isAdmin || !isController || errAdmin != nil || errController != nil {
-		return
-	}
-
-	fines := fh.dao.GetZoneFines(c.Request.Context(), zoneId, *params.Limit, *params.Offset)
-	c.JSON(http.StatusOK, fines)
 }

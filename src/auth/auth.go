@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
@@ -11,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -200,7 +200,19 @@ func ValidateOTP(otp string) error {
 		return nil // Bypass OTP validation in debug mode
 	}
 
-	resp, err := http.PostForm(AUTH_URL+OTP_ENDPOINT, url.Values{"otp": {otp}})
+	payload := map[string]string{"otp": otp}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", AUTH_URL+OTP_ENDPOINT, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}

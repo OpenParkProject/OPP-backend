@@ -92,7 +92,7 @@ func (d *CarDao) AddUserCar(c context.Context, username string, car api.Car) err
 	query := "INSERT INTO cars (plate, brand, model, user_id) VALUES ($1, $2, $3, $4)"
 	_, err := d.db.Exec(c, query, car.Plate, car.Brand, car.Model, username)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			return ErrCarAlreadyExists
 		}
 		return fmt.Errorf("failed to add car: %w", err)

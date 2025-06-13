@@ -342,3 +342,23 @@ func (zh *ZoneHandlers) GetUserZonesByUsername(c *gin.Context, username string) 
 	}
 	c.JSON(http.StatusOK, zones)
 }
+
+func (zh *ZoneHandlers) GetUserZonesByOTP(c *gin.Context, otp string) {
+	// Get the username from the OTP from Auth service
+	username, err := auth.GetUsernameFromOTP(otp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get username from OTP"})
+		return
+	}
+
+	zones, err := zh.dao.GetUserZones(c.Request.Context(), username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user zones"})
+		return
+	}
+	if len(zones) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no zones found for this user"})
+		return
+	}
+	c.JSON(http.StatusOK, zones)
+}

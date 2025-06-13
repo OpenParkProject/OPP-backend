@@ -84,7 +84,7 @@ func (z *ZoneDao) CreateZone(c context.Context, zone api.ZoneRequest) (*api.Zone
 	)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			return nil, ErrZoneAlreadyExists
 		}
 		if strings.Contains(err.Error(), "Zone overlaps with an existing zone") {
@@ -517,7 +517,7 @@ func (z *ZoneDao) AddUserToZone(c context.Context, zoneId int64, request api.Zon
 		&userRole.AssignedAt,
 		&userRole.AssignedBy,
 	); err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			return nil, ErrZoneUserRoleAlreadyExists
 		}
 		if strings.Contains(err.Error(), "invalid input value for enum zone_user_role") {

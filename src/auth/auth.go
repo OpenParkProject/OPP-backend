@@ -29,6 +29,7 @@ var PUBKEY_ENDPOINT = os.Getenv("PUBKEY_ENDPOINT")
 
 // URL to the OTP validation endpoint
 var OTP_ENDPOINT = os.Getenv("OTP_ENDPOINT")
+var USER_BY_OTP_ENDPOINT = os.Getenv("USER_BY_OTP_ENDPOINT")
 
 var (
 	ErrUnauthorized    = errors.New("unauthorized")
@@ -209,9 +210,14 @@ func ValidateOTP(otp string) error {
 	if err != nil {
 		return err
 	}
+
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -223,4 +229,48 @@ func ValidateOTP(otp string) error {
 	}
 
 	return nil
+}
+
+func GetUsernameFromOTP(otp string) (string, error) {
+	if DEBUG_MODE == "true" {
+		return "debug_user", nil // Return debug username in debug mode
+	}
+
+	// USER_BY_OTP_ENDPOINT = /users/me/{otp}
+	userByOTPEndpoint := strings.Replace(USER_BY_OTP_ENDPOINT, "{otp}", otp, 1)
+	endpoint := AUTH_URL + userByOTPEndpoint
+	fmt.Printf("Getting username with OTP at: %s\n", endpoint)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Failed to get username from OTP: %s - %s", resp.Status, string(body))
+	}
+
+	var response struct {
+		Username string `json:"username"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", err
+	}
+
+	return response.Username, nil
 }

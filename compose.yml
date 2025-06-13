@@ -8,6 +8,7 @@ services:
       AUTH_URL: http://opp-auth:8090/api/v1
       PUBKEY_ENDPOINT: /pubkey
       OTP_ENDPOINT: /otp/validate
+      USER_BY_OTP_ENDPOINT: /otp/users/{otp}
       OPP_BACKEND_DB_HOST: opp-postgres-backend
       OPP_BACKEND_DB_PORT: 5432
       POSTGRES_BACKEND_USER: user

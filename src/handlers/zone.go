@@ -254,8 +254,8 @@ func (zh *ZoneHandlers) AddZoneUserRole(c *gin.Context, id int64) {
 
 	// Check permissions
 	if request.Role == "admin" {
-		if role != "superuser" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		isAdmin, err := zh.isZoneAdmin(c, id, username)
+		if role != "superuser" && (!isAdmin || err != nil) {
 			return
 		}
 	} else if request.Role == "controller" {
